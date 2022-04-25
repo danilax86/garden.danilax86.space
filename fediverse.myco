@@ -1,5 +1,5 @@
-img {
-   fediverse/logo
+img side {
+   fediverse/logo | 200
 }
 
 
