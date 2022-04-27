@@ -1,4 +1,6 @@
-
 img {
    ./цветы
 }
+
+[[nox]] <= nox
+[[boris]] <= boris
