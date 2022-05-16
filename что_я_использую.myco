@@ -1,0 +1,24 @@
+Список приложений и сервисов, которые я использую для рабочих и личных нужд. Буду обновлять, как только, так сразу
+
+== Любимые
+* [[https://manjaro.org/download/ | Manjaro KDE Plasma]]: снова мой основной Linux дистрибутив
+* [[https://crdroid.net/ | CrDroid]]: кастомная прошивка для Android
+* [[https://vivaldi.com/ru/ | Vivaldi]]: браузер, который можно очень легко кастомизировать под определённые ситуации
+* [[https://organicmaps.app | Organic Maps]]: лучшие по дизайну и быстродействию карты, использующие базу [[OpenStreetMap]]
+* [[https://duckduckgo.com/ | DuckDuckGo]]: приватный поисковой движок
+* [[https://f-droid.org/ | F-Droid]]: магазин FOSS-приложений Android
+* [[https://lutris.net | Lutris]]: позволяет запускать игры под Linux`ом
+
+== Кроссплатформенное ПО
+* [[https://obsidian.md | Obsidian]]: заметочник
+* [[https://bitwarden.com/ | Bitwarden]]: парольный менеджер
+* [[https://www.thunderbird.net/ru/ | Thunderbird]]: почтовый клиент
+* [[https://www.darktable.org/ | Darktable]]: приложение для обработки фотографий
+
+== Self-Hosted приложения
+Приложения, которые крутятся у меня на сервере.
+* [[https://yunohost.org/#/ | Yunohost]]: операционная система с веб-интерфейсом для управления приложениями на сервере
+* [[https://nextcloud.com | Nexcloud]]: облачное хранилище а-ля Google Drive
+* [[https://piwigo.org/ | Piwigo]]: облако для фотографий с богатой библиотекой плагинов
+* [[https://sabre.io/baikal/ | Baïkal]]: CalDAV сервер
+* [[https://tt-rss.org | Tiny Tiny RSS]]: RSS-читалка с сервером
