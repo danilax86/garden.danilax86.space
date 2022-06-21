@@ -1,0 +1,359 @@
+У меня было 2 сисколла, 40 свободных гигов для виртуалки, 12 потоков, Linux Kernel 5.8.1 и множество статей, инструкций и документаций всех сортов и расцветок, а также Ubuntu 20.04 LTS, vim и мои нервы. Не то что бы это был необходимый запас для сборки. Но если начал собирать ядро, становится трудно остановиться. Единственное что вызывало у меня опасение -- это кернелспейс. Нет ничего более беспомощного, безответственного и испорченного, чем студент, пытающийся разобраться в ядре Linux. Я знал, что рано или поздно закончу собирать эту дрянь.
+
+== Начинаем путешествие
+Копаться в ядре стоит прежде всего на виртуальной машине.
+Иначе, если что-то сломается, операционная система может просто не взлететь.
+Ставим образ Убунты на виртуальную машину. Я делал через Boxes, ибо так проще всего.
+
+=== Запускаем виртуалку и полностью её обновляем
+```shell
+sudo apt update && sudo apt upgrade
+```
+
+=== Скачиваем нужные пакеты для сборки ядра
+```shell
+sudo apt install build-essential libncurses-dev libssl-dev libelf-dev bison flex
+```
+
+=== Устанавливаем архив ядра
+```shell
+wget -P ~/Downloads/ https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.8.1.tar.xz
+```
+
+=== Распаковываем архив ядра в домашнюю директорию
+```shell
+tar -xvf ~/Downloads/linux-5.8.1.tar.xz -C ~/
+```
+
+== Пишем системный вызов
+В системном вызове мне нужно достучаться до структуры `pci_dev`,
+достав любое pci-устройство, и вывести поля device и vendor в пространство пользователя.
+
+=== Переходим в директорию ядра
+```shell
+cd ~/linux-5.8.1/
+```
+
+=== Создаём директорию с именем эквивалентному нашему системному вызову.
+В моём случае нужно достать поля из структуры `pci_dev`. Так и назовём директорию.
+```shell
+mkdir pci_dev
+```
+
+=== Создаём C файл и записываем код системного вызова в него
+```shell
+vim pci_dev/pci_dev.c
+```
+
+```c
+#include <linux/kernel.h>
+#include <linux/syscalls.h>
+#include <linux/pci.h>
+#include <linux/uaccess.h>
+
+// Структура, которую будем передавать в пространство пользователя
+struct pci_device_info {
+	unsigned short vendor_id;
+	unsigned short device_id;
+};
+
+/* Объявление системного вызова (да, запятые в аргументах правильные).
+ info - указатель на такую же структуру, но в пространстве пользователя.
+*/
+SYSCALL_DEFINE1(pci_dev, struct pci_device_info *, info)
+{
+	struct pci_dev *dev = NULL;
+	struct pci_device_info dev_info;
+
+	dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev);
+	dev_info.device_id = dev->device;
+	dev_info.vendor_id = dev->vendor;
+
+    // Печатаем информацию о структуре в пространство ядра
+	printk(KERN_INFO "pci vendor id [%d]\n", dev_info.vendor_id);
+	printk(KERN_INFO "pci device id [%d]\n", dev_info.device_id);
+
+    // Передаём структуру в пространство пользователя
+	copy_to_user(info, &dev_info, sizeof(struct pci_device_info));
+
+	return 0;
+}
+```
+
+Сохраняем изменения и выходим из vim'а.
+
+=== В той же директории создаём Makefile
+```shell
+vim pci_dev/Makefile
+```
+
+Пишем это в Makefile нашего системного вызова.
+```
+obj-y := pci_dev.o
+```
+
+=== Открываем Makefile ядра
+```shell
+vim Makefile
+```
+Здесь нам нужна строчка `core-y` с перечислением директорий а-ля `kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/`
+
+Дописываем здесь директорию с нашим системным вызовом.
+Должно получиться так:
+`kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/ pci_dev/`
+
+=== Добавляем прототип функции нашего системного вызова и структуру в заголовочный файл системных вызовов
+```shell
+vim include/linux/syscalls.h
+```
+
+В самый конец над `#endif` добавляем 
+```
+struct pci_device_info;
+asmlinkage long sys_pci_dev(struct pci_device_info *);
+```
+
+=== Добавляем запись о нашем системном вызове в таблицу системных вызовов
+```shell
+vim arch/x86/entry/syscalls/syscall_64.tbl
+```
+
+В самый конец таблицы с 64-битным системными вызовами пишем следующее.
+```shell
+440     common  pci_dev                sys_pci_dev
+```
+Важно соблюдать нумерацию и табы.
+
+==Установка и сборка ядра
+=== Конфигурируем ядро
+Здесь нам нужна стандартная конфигурация.
+```shell
+make menuconfig
+```
+Тыкаем в **Save**, а потом в **Exit**.
+
+=== Узнаём, сколько у нас логических ядер
+```shell
+nproc
+```
+У меня их 12. Это нужно, чтобы задействовать все ядра процессора для сборки ядра операционной системы (беды с терминологией ).
+
+=== Собираем ядро
+```shell
+make -j12
+```
+`-j` - с помощью этого флага указываем, сколько задач будет исполняться одновременно
+
+=== Собираем модули для установки ядра
+```shell
+sudo make modules_install -j12
+```
+
+=== Устанавливаем ядро
+```shell
+sudo make install -j12
+```
+
+=== Обновляем загрузчик, чтобы запуститься с новым ядром
+```shell
+sudo update-grub
+```
+
+=== Перезагружаемся
+```shell
+reboot
+```
+
+== Пишем программу в user-space
+Теперь напишем программу, которая будет делать системный вызов и выводить в стандартный поток информацию о структуре.
+
+=== Создаём C программу
+```c
+#include <linux/kernel.h>
+#include <sys/syscall.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <errno.h>
+
+// Определяем системный вызов для простоты
+#define __NR_pci_dev 440
+
+// Наша пользовательская структура, которую будем заполнять с помощью системного вызова
+struct pci_device_info {
+	unsigned short vendor_id;
+	unsigned short device_id;
+};
+
+// Определение функции для системного вызова
+long pci_dev_syscall(struct pci_device_info *ptr)
+{
+	return syscall(__NR_pci_dev, ptr);
+}
+
+int main()
+{
+    // Инициализируем структуру для заполнения
+	struct pci_device_info result = { 0 };
+
+    // Исполняем системный вызов, в аргумент которого помещаем указатель на пользовательскую структуру
+	pci_dev_syscall(&result);
+
+    // Выводим поля структуры в стандартный поток
+	printf("vendor_id: %hu\n", result.vendor_id);
+	printf("device_id: %d\n", result.device_id);
+
+	return 0;
+}
+```
+
+=== Собираем программу
+```shell
+gcc -o pci_dev_user pci_dev_user.c
+```
+
+=== Запускаем программу
+```shell
+ ./pci_dev_user
+ vendor_id: 32902
+ device_id: 10688
+```
+
+=== Смотрим вывод ядра
+```shell
+dmesg
+[   38.604541] pci vendor id [32902]
+[   38.604544] pci device id [10688]
+```
+  
+Работает!
+
+
+== То же самое, но для структуры `syscall_info`
+Буду более краток, ибо процесс по сборке и написанию идентичный.
+Однако, чтобы достать структуру пришлось много потеть и прыгать от одной структуры к другой.
+
+=== Системный вызов
+```c
+#include <linux/kernel.h>
+#include <linux/syscalls.h>
+#include <linux/uaccess.h>
+#include <linux/ptrace.h>
+#include <linux/sched.h>
+#include <linux/pid.h>
+#include <linux/sched/task_stack.h>
+#include <linux/export.h>
+#include <linux/types.h>
+
+// Здесь структура очень маленькая, так что просто передаём её напрямую пользователю, используя определение из ptrace.h
+
+SYSCALL_DEFINE2(syscall_info, int, pid_input, struct syscall_info *, info)
+{
+	printk(KERN_INFO "process's pid: %d\n", pid_input);
+    
+	struct pid *pid_task = NULL;
+	pid_task = find_get_pid(pid_input);
+
+	struct task_struct *task = NULL;
+	task = get_pid_task(pid_task, PIDTYPE_PID);
+
+	struct syscall_info sys_info;
+	task_current_syscall(task, &sys_info);
+
+	printk(KERN_INFO "user_sp: %llu", sys_info.sp);
+
+	copy_to_user(info, &sys_info, sizeof (struct syscall_info));
+
+	return 0;
+}
+```
+
+=== Клиентская программа
+```c
+#include <linux/kernel.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#define __NR_syscall_info 441
+
+// Задаём описание структуры (шарить заголовки ядра для пользователей -- моветон)
+
+struct seccomp_data {
+	int nr;
+	__u32 arch;
+	__u64 instruction_pointer;
+	__u64 args[6];
+};
+
+struct syscall_info {
+	__u64 sp;
+	struct seccomp_data data;
+};
+
+long syscall_info_syscall(int pid_input, struct syscall_info *ptr)
+{
+	return syscall(__NR_syscall_info, pid_input, ptr);
+}
+
+int main(int argc, char **argv)
+{
+	char *a = argv[1];
+	int pid_id = atoi(a);
+
+	printf("Pid_id: %d\n", pid_id);
+
+	struct syscall_info result;
+
+	syscall_info_syscall(pid_id, &result);
+
+	printf("Syscall_number: %d\n", result.data.nr);
+	printf("User Stack Pointer: %lld\n", result.sp);
+
+	return 0;
+}
+```
+
+=== Запускаем программу
+``` shell
+Pid_id: 958
+Syscall_number: 7
+User Stack Pointer: 140726335318048
+```
+
+=== Смотрим вывод ядра
+``` shell
+[   21.342638] user_sp: 140726335318048
+```
+
+Указатели стека идентичны, значит, структура передана верно!
+
+== Проблемы и решения
+
+=== Не работает "sudo update-grub" 
+Изменяем конфигурацию загрузчика, чтобы загрузиться с нужным ядром
+``` shell
+vim /etc/default/grub
+```
+
+Строки ниже должны быть следующими:
+```shell
+GRUB_DEFAULT=0
+GRUB_TIMEOUT=-1 # Чтобы была возможность выбрать нужную версию ядра
+GRUB_HIDDEN_TIMEOUT=0
+```
+
+=== Что-то там с сертификатами и доверенными ключами
+Изменяем конфигурацию ядра.
+```shell
+scripts/config --disable SYSTEM_TRUSTED_KEYS
+```
+или
+```shell
+scripts/config --set-str SYSTEM_TRUSTED_KEYS ""
+```
+
+=== BTF: .tmp_vmlinux.btf: pahole (pahole) is not available
+```shell
+sudo apt install dwarves
+```
