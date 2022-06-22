@@ -11,3 +11,16 @@ img side {
 * [[https://osm.org/user/danilax86]] - профиль в [[OpenStreetMap | картах]]
 
 [[Что я использую]]
+
+== [[ GPG ]]
+[[ ./Публичный ключ | Публичный ключ ]]
+```
+  pub   rsa4096 2022-06-18
+        Key fingerprint = 4D4B 0777 7807 01AB 2E81  9760 F672 B1BE 11AC 2BBB
+  uid   Danila Gorelko (gpg)        <danila@danilax86.space>
+  uid   Danila Gorelko (job mail)   <job@danilax86.space>
+  uid   Danila Gorelko (hello mail) <hello@danilax86.space>
+  uid   Danila Gorelko (study mail) <study@danilax86.space>
+  sub   rsa4096 2022-06-18
+```
+
